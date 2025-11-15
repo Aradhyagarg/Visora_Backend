@@ -134,8 +134,75 @@ export const generateImage = async (req, res) => {
   }
 };
 
+export const removeImageBackground = async (req, res) => {
+  try {
+    const { userId } = req.auth();
+    const image = req.file?.path;
+
+    if (!image) return res.status(400).json({ success: false, message: "No image uploaded" });
+
+    const upload = await cloudinary.uploader.upload(image, {
+      folder: "background_remove",
+    });
+
+    const transformedUrl = cloudinary.url(upload.public_id, {
+      transformation: [
+        {
+          effect: "gen_background_remove"
+        }
+      ]
+    });
+
+    await Creation.create({
+      user_id: userId,
+      prompt: "Remove background",
+      content: transformedUrl,
+      type: "image",
+    });
+
+    res.json({ success: true, content: transformedUrl });
+  } catch (error) {
+    console.error("BG remove ERROR:", error);
+    res.status(500).json({ success: false, message: "Something went wrong" });
+  }
+};
 
 export const removeBackgroundObject = async (req, res) => {
+  try {
+    const { userId } = req.auth();
+    const { object } = req.body;
+    const image = req.file?.path;
+
+    if (!image) return res.status(400).json({ success: false, message: "No image uploaded" });
+    if (!object) return res.status(400).json({ success: false, message: "No object specified" });
+
+    const upload = await cloudinary.uploader.upload(image, { folder: "object_removal" });
+
+    const transformedUrl = cloudinary.url(upload.public_id, {
+      transformation: [
+        {
+          effect: "gen_remove",
+          prompt: object
+        }
+      ]
+    });
+
+    await Creation.create({
+      user_id: userId,
+      prompt: `Remove ${object}`,
+      content: transformedUrl,
+      type: "image",
+    });
+
+    return res.json({ success: true, content: transformedUrl });
+  } catch (err) {
+    console.error("Object removal ERROR:", err);
+    return res.status(500).json({ success: false, message: "Something went wrong" });
+  }
+};
+
+
+/*export const removeBackgroundObject = async (req, res) => {
   try {
     const { userId } = req.auth();
     const { object } = req.body;
@@ -227,4 +294,4 @@ export const removeImageBackground = async (req, res) => {
     console.error("Remove background error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
-};
+};*/
