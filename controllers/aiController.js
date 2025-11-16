@@ -139,19 +139,22 @@ export const removeImageBackground = async (req, res) => {
     const { userId } = req.auth();
     const image = req.file?.path;
 
-    if (!image) return res.status(400).json({ success: false, message: "No image uploaded" });
+    if (!image) {
+      return res.status(400).json({ success: false, message: "No image uploaded" });
+    }
 
     const upload = await cloudinary.uploader.upload(image, {
       folder: "background_remove",
+      resource_type: "image"
     });
 
     const transformedUrl = cloudinary.url(upload.public_id, {
-      transformation: [
-        {
-          effect: "gen_background_remove"
-        }
-      ]
+      effect: "background_removal",
+      fetch_format: "auto",
+      quality: "auto"
     });
+
+    console.log("Transformed URL:", transformedUrl);
 
     await Creation.create({
       user_id: userId,
@@ -160,10 +163,17 @@ export const removeImageBackground = async (req, res) => {
       type: "image",
     });
 
+    if (fs.existsSync(image)) {
+      fs.unlinkSync(image);
+    }
+
     res.json({ success: true, content: transformedUrl });
   } catch (error) {
     console.error("BG remove ERROR:", error);
-    res.status(500).json({ success: false, message: "Something went wrong" });
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || "Something went wrong" 
+    });
   }
 };
 
@@ -173,19 +183,26 @@ export const removeBackgroundObject = async (req, res) => {
     const { object } = req.body;
     const image = req.file?.path;
 
-    if (!image) return res.status(400).json({ success: false, message: "No image uploaded" });
-    if (!object) return res.status(400).json({ success: false, message: "No object specified" });
+    if (!image) {
+      return res.status(400).json({ success: false, message: "No image uploaded" });
+    }
+    
+    if (!object) {
+      return res.status(400).json({ success: false, message: "No object specified" });
+    }
 
-    const upload = await cloudinary.uploader.upload(image, { folder: "object_removal" });
+    const upload = await cloudinary.uploader.upload(image, { 
+      folder: "object_removal",
+      resource_type: "image"
+    });
 
     const transformedUrl = cloudinary.url(upload.public_id, {
-      transformation: [
-        {
-          effect: "gen_remove",
-          prompt: object
-        }
-      ]
+      effect: `gen_remove:prompt_${object}`,
+      fetch_format: "auto",
+      quality: "auto"
     });
+
+    console.log("Transformed URL:", transformedUrl);
 
     await Creation.create({
       user_id: userId,
@@ -194,10 +211,17 @@ export const removeBackgroundObject = async (req, res) => {
       type: "image",
     });
 
+    if (fs.existsSync(image)) {
+      fs.unlinkSync(image);
+    }
+
     return res.json({ success: true, content: transformedUrl });
   } catch (err) {
     console.error("Object removal ERROR:", err);
-    return res.status(500).json({ success: false, message: "Something went wrong" });
+    return res.status(500).json({ 
+      success: false, 
+      message: err.message || "Something went wrong" 
+    });
   }
 };
 
