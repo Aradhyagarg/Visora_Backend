@@ -137,21 +137,36 @@ export const generateImage = async (req, res) => {
 export const removeImageBackground = async (req, res) => {
   try {
     const { userId } = req.auth();
-    const image = req.file?.path;
 
-    if (!image) {
-      return res.status(400).json({ success: false, message: "No image uploaded" });
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "No image uploaded" 
+      });
     }
 
-    const upload = await cloudinary.uploader.upload(image, {
-      folder: "background_remove",
-      resource_type: "image"
+    console.log("Processing background removal for user:", userId);
+
+    const uploadPromise = new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: "background_remove",
+          resource_type: "image",
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+      uploadStream.end(req.file.buffer);
     });
+
+    const upload = await uploadPromise;
 
     const transformedUrl = cloudinary.url(upload.public_id, {
       effect: "background_removal",
       fetch_format: "auto",
-      quality: "auto"
+      quality: "auto",
     });
 
     console.log("Transformed URL:", transformedUrl);
@@ -163,16 +178,12 @@ export const removeImageBackground = async (req, res) => {
       type: "image",
     });
 
-    if (fs.existsSync(image)) {
-      fs.unlinkSync(image);
-    }
-
     res.json({ success: true, content: transformedUrl });
   } catch (error) {
     console.error("BG remove ERROR:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message || "Something went wrong" 
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to remove background",
     });
   }
 };
@@ -181,25 +192,43 @@ export const removeBackgroundObject = async (req, res) => {
   try {
     const { userId } = req.auth();
     const { object } = req.body;
-    const image = req.file?.path;
 
-    if (!image) {
-      return res.status(400).json({ success: false, message: "No image uploaded" });
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "No image uploaded" 
+      });
     }
-    
+
     if (!object) {
-      return res.status(400).json({ success: false, message: "No object specified" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "No object specified" 
+      });
     }
 
-    const upload = await cloudinary.uploader.upload(image, { 
-      folder: "object_removal",
-      resource_type: "image"
+    console.log("Processing object removal:", object, "for user:", userId);
+
+    const uploadPromise = new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: "object_removal",
+          resource_type: "image",
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+      uploadStream.end(req.file.buffer);
     });
+
+    const upload = await uploadPromise;
 
     const transformedUrl = cloudinary.url(upload.public_id, {
       effect: `gen_remove:prompt_${object}`,
       fetch_format: "auto",
-      quality: "auto"
+      quality: "auto",
     });
 
     console.log("Transformed URL:", transformedUrl);
@@ -211,20 +240,15 @@ export const removeBackgroundObject = async (req, res) => {
       type: "image",
     });
 
-    if (fs.existsSync(image)) {
-      fs.unlinkSync(image);
-    }
-
     return res.json({ success: true, content: transformedUrl });
   } catch (err) {
     console.error("Object removal ERROR:", err);
-    return res.status(500).json({ 
-      success: false, 
-      message: err.message || "Something went wrong" 
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Failed to remove object",
     });
   }
 };
-
 
 /*export const removeBackgroundObject = async (req, res) => {
   try {
