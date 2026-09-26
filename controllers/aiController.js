@@ -15,7 +15,12 @@ const generateTextWithGemini = async (prompt) => {
     throw new Error("GEMINI_API_KEY is missing from environment variables.");
   }
   const AI = new GoogleGenerativeAI(apiKey);
-  const modelsToTry = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"];
+  const modelsToTry = [
+    "gemini-2.5-flash",
+    "gemini-1.5-flash-latest",
+    "gemini-3.8-flash",
+    "gemini-3.1-pro-preview"
+  ];
   let lastError = null;
 
   for (const modelName of modelsToTry) {
