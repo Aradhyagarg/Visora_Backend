@@ -5,11 +5,11 @@ import FormData from "form-data";
 import fs from "fs";
 import { v2 as cloudinary } from "cloudinary";
 import dotenv from "dotenv";
+dotenv.config();
+
 import { GoogleGenerativeAI } from "@google/generative-ai";
 const AI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = AI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
-dotenv.config();
 
 export const generateArticle = async (req, res) => {
   try {
