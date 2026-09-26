@@ -8,14 +8,30 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
-const AI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = AI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+const generateTextWithGemini = async (prompt) => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is missing from environment variables.");
+  }
+  const AI = new GoogleGenerativeAI(apiKey);
+  try {
+    const model = AI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  } catch (err) {
+    console.warn("gemini-1.5-flash failed, trying gemini-2.0-flash:", err.message);
+    const model2 = AI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const result2 = await model2.generateContent(prompt);
+    return result2.response.text();
+  }
+};
 
 export const generateArticle = async (req, res) => {
   try {
     const { userId } = req.auth();
     const { prompt } = req.body;
-    const { plan, free_usage } = req;
+    const { plan, free_usage = 0 } = req;
 
     if (plan !== "premium" && free_usage >= 10) {
       return res.json({
@@ -24,8 +40,7 @@ export const generateArticle = async (req, res) => {
       });
     }
 
-    const result = await model.generateContent(prompt);
-    const content = result.response.text();
+    const content = await generateTextWithGemini(prompt);
 
     await Creation.create({
       user_id: userId,
@@ -35,16 +50,20 @@ export const generateArticle = async (req, res) => {
     });
 
     if (plan !== "premium") {
-      await clerkClient.users.updateUserMetadata(userId, {
-        privateMetadata: { free_usage: free_usage + 1 },
-      });
+      try {
+        await clerkClient.users.updateUserMetadata(userId, {
+          privateMetadata: { free_usage: (free_usage || 0) + 1 },
+        });
+      } catch (metadataErr) {
+        console.warn("Failed to update Clerk metadata:", metadataErr.message);
+      }
     }
 
     res.json({ success: true, content });
 
   } catch (error) {
-    console.error("AI Controller error:", error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error("AI Controller error (generateArticle):", error);
+    res.status(500).json({ success: false, message: error.message || "Failed to generate article" });
   }
 };
 
@@ -52,7 +71,7 @@ export const generateBlogTitle = async (req, res) => {
   try {
     const { userId } = req.auth();
     const { prompt } = req.body;
-    const { plan, free_usage } = req;
+    const { plan, free_usage = 0 } = req;
 
     if (plan !== "premium" && free_usage >= 10) {
       return res.json({
@@ -61,8 +80,7 @@ export const generateBlogTitle = async (req, res) => {
       });
     }
 
-    const result = await model.generateContent(prompt);
-    const content = result.response.text();
+    const content = await generateTextWithGemini(prompt);
 
     await Creation.create({
       user_id: userId,
@@ -72,15 +90,19 @@ export const generateBlogTitle = async (req, res) => {
     });
 
     if (plan !== "premium") {
-      await clerkClient.users.updateUserMetadata(userId, {
-        privateMetadata: { free_usage: free_usage + 1 },
-      });
+      try {
+        await clerkClient.users.updateUserMetadata(userId, {
+          privateMetadata: { free_usage: (free_usage || 0) + 1 },
+        });
+      } catch (metadataErr) {
+        console.warn("Failed to update Clerk metadata:", metadataErr.message);
+      }
     }
 
     res.json({ success: true, content });
   } catch (error) {
-    console.log("Blog title error:", error.message);
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Blog title error:", error);
+    res.status(500).json({ success: false, message: error.message || "Failed to generate blog title" });
   }
 };
 
