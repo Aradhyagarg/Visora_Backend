@@ -15,16 +15,22 @@ const generateTextWithGemini = async (prompt) => {
     throw new Error("GEMINI_API_KEY is missing from environment variables.");
   }
   const AI = new GoogleGenerativeAI(apiKey);
-  try {
-    const model = AI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent(prompt);
-    return result.response.text();
-  } catch (err) {
-    console.warn("gemini-1.5-flash failed, trying gemini-2.0-flash:", err.message);
-    const model2 = AI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    const result2 = await model2.generateContent(prompt);
-    return result2.response.text();
+  const modelsToTry = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"];
+  let lastError = null;
+
+  for (const modelName of modelsToTry) {
+    try {
+      const model = AI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      const text = result?.response?.text();
+      if (text) return text;
+    } catch (err) {
+      console.warn(`Gemini model ${modelName} failed:`, err.message);
+      lastError = err;
+    }
   }
+
+  throw new Error(lastError?.message || "All Gemini API models failed to generate content.");
 };
 
 export const generateArticle = async (req, res) => {
